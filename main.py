@@ -46,6 +46,9 @@ if OPENAI_KEY:
     import openai
     openai.api_key = "40e94d7a-597f-48c1-accd-d515237e0e3f"
 
+
+
+
 def make_hint(cards: List[int], sol_ids: Tuple[int, int, int], level: int) -> str:
     """
     level 0 → vague  | 1 → mention a shared/different feature
@@ -53,15 +56,56 @@ def make_hint(cards: List[int], sol_ids: Tuple[int, int, int], level: int) -> st
     """
     if OPENAI_KEY:                                    # real LLM
         shapes = ["one", "two", "three"]
-        prompt = (f"You are a Set tutor. Board has 12 cards coded like 1020.\n"
-                   "Your job: give a hint without revealing the full triplet.\n"
-                   f"The solution involves cards at indices {sol_ids} (0‑based). "
-                   f"Hint level = {level}.")
+        # prompt = (f"You are a Set tutor. Board has 12 cards coded like 1020.\n"
+        #            "Your job: give a hint without revealing the full triplet.\n"
+        #            f"The solution involves cards at indices {sol_ids} (0‑based). "
+        #            f"Hint level = {level}.")
 
+        sol_card_1_idx, sol_card_2_idx, sol_card_3_idx = sol_ids
+
+        base_prompt = (
+            f"Hello! you are a 'Set' card game tutor. This game involves finding a 'Set' of three cards.\n"
+            f"Each card has four features: shape, color, number, and shading, with three possibilities for each feature.\n"
+            f"A 'Set' consists of three cards where, for each of the four features, the attributes are either all the same on all three cards, or all different on all three cards.\n"
+            f"There are currently 12 cards on the board, indexed from 0 to 11.\n\n"
+            f"There is at least one 'Set' on the board!\n"
+            f"To help you provide the best hint, one such 'Set' involves the cards at indices "
+            f"{sol_card_1_idx}, {sol_card_2_idx}, and {sol_card_3_idx}. Do not directly reveal all three of these indices to the user unless the hint level specifically allows it."
+        )
+
+        hint_instructions = f"Your task is to give the user a friendly and helpful hint based on the current hint level. Please try to avoid giving away the full solution directly, unless the hint level is very high."
+
+        if level == 0:
+            hint_instructions += (
+                f"Current Hint Level is 0 which means very gentle hint \n\n"
+                f"Instruction: Politely inform the user that there is indeed at least one 'Set' to be found on the board and encourage them to keep looking.\n"
+                f"Example: 'It looks like there's at least one Set hiding on the board! Keep up the great search please!'"
+            )
+        elif level == 1:
+            hint_instructions += (
+                f"Current Hint level is 1 ,which means you should suggest a direction or focus\n"
+                f"**instructions**: you should: Gently guide the user to focus on ONE of the cards from the solution. \n"
+                f"For example: 'Perhaps you could start by taking a closer look at the card at position {sol_card_1_idx}?' or 'The card at position {sol_card_2_idx} might offer a good starting point.'"
+                f"**Please note**, only mention one card's specific index at a time."
+            )
+        elif level == 2:
+            hint_instructions += (
+                f"Current Hint Level is 2 which reveal 2wo cards.\n\n"
+                f"**Instruction**: you should tell the user the indices of two of the cards that form the 'Set'.\n"
+                f"Example: 'I've taken a peek for you, and the cards at positions {sol_card_1_idx} and {sol_card_2_idx} are part of a Set. Can you find the third one?'\n"
+            )
+        else:
+            hint_instructions += (
+                f"Current Hint Level is {level} ,this level means more specific help\n"
+                f"Instruction: Since the hint level is very high(e.g., 3 or more), you can offer more direct assistance. For instance,"
+                f" you could consider revealing the full 'Set' as a final step, but must ensure your tone remains helpful and guiding.\n"
+                f"Example: 'Alright, let's narrow it down: the cards at {sol_card_1_idx} and {sol_card_2_idx} are part of a Set. The third card you're looking for is {sol_card_1_idx}'"
+            )
+        final_prompt = base_prompt + hint_instructions + "output your hint now.\n"
 
         rsp = openai.ChatCompletion.create(
             model="gpt-4o-mini",          # cheap & fast
-            messages=[{"role":"system","content":prompt}]
+            messages=[{"role":"system","content":final_prompt}]
         )
         return rsp.choices[0].message.content.strip()
 
@@ -113,3 +157,5 @@ def chat(sid: str, inp: MsgIn):
         reply = make_hint(sess["cards"], sess["solution"], sess["level"])
     return JSONResponse({"assistant": reply,
                          "level": sess["level"]})
+
+
